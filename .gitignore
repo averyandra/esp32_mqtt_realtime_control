@@ -1,0 +1,9 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual Environment
+vorsapi-env/
+
+# Runtime state / local data
+state.json
