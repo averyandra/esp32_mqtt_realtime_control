@@ -3,20 +3,18 @@ import os
 import paho.mqtt.client as mqtt
 from config import MQTT_BROKER, MQTT_PORT, TOPIC_TELEMETRY, TOPIC_STATUS, STATE_FILE
 
-# 1. Struktur internal standar (Template Data Baseline VORSA Lab)
 DEFAULT_STRUCTURE = {
     "telemetry": {
         "12v": 0.0, "5v": 0.0, "5vsb": 0.0, "pg": 0,
         "env": {"temp": 0.0, "hum": 0, "pres": 0.0}
     },
     "status": {
-        "lampu_utama": "OFF", "led_strip": "OFF", "exhaust_fan": "OFF"
+        "lamp": "OFF", "led": "OFF", "fan": "OFF"
     }
 }
 
 latest_cache = DEFAULT_STRUCTURE.copy()
 
-# Fungsi bantu untuk mengamankan penulisan file fisik ke disk
 def save_cache_to_disk():
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
@@ -26,25 +24,23 @@ def save_cache_to_disk():
 
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
-        print("[-] Listener VORSA aktif, memantau broker Armbian...")
+        print("[-] Listener active, listening to broker")
         client.subscribe(TOPIC_TELEMETRY)
         client.subscribe(TOPIC_STATUS)
     else:
-        print(f"[!] Listener gagal terhubung ke Broker, code: {reason_code}")
+        print(f"[!] Failed connecting listener to Broker, code: {reason_code}")
 
 def on_message(client, userdata, msg):
     try:
         payload_str = msg.payload.decode('utf-8')
         
-        # Cetak data mentah yang masuk ke terminal untuk verifikasi sirkuit
-        print(f"📡 [MQTT INBOUND] Topik: {msg.topic} | Payload: {payload_str}")
+        print(f"📡 [MQTT INBOUND] Topic: {msg.topic} | Payload: {payload_str}")
         
-        # Kebal terhadap variasi string 'nan' dari sensor
         payload_str = payload_str.replace('nan', 'null').replace('NAN', 'null').replace('NaN', 'null')
         raw_data = json.loads(payload_str)
 
         if msg.topic == TOPIC_TELEMETRY:
-            latest_cache["telemetry"]["12v"] = raw_data.get("12v") or raw_data.get("v12") or latest_cache["telemetry"]["12v"]
+            latest_cache["telemketry"]["12v"] = raw_data.get("12v") or raw_data.get("v12") or latest_cache["telemetry"]["12v"]
             latest_cache["telemetry"]["5v"] = raw_data.get("5v") or raw_data.get("v5") or latest_cache["telemetry"]["5v"]
             latest_cache["telemetry"]["5vsb"] = raw_data.get("5vsb") or raw_data.get("v5vsb") or latest_cache["telemetry"]["5vsb"]
             latest_cache["telemetry"]["pg"] = raw_data.get("pg") if raw_data.get("pg") is not None else raw_data.get("power_good", latest_cache["telemetry"]["pg"])
@@ -61,19 +57,17 @@ def on_message(client, userdata, msg):
                 latest_cache["telemetry"]["env"]["pres"] = raw_data.get("pres") or raw_data.get("pressure") or latest_cache["telemetry"]["env"]["pres"]
 
         elif msg.topic == TOPIC_STATUS:
-            latest_cache["status"]["lampu_utama"] = raw_data.get("lampu_utama") or raw_data.get("lampu") or latest_cache["status"]["lampu_utama"]
-            latest_cache["status"]["led_strip"] = raw_data.get("led_strip") or raw_data.get("led") or latest_cache["status"]["led_strip"]
-            latest_cache["status"]["exhaust_fan"] = raw_data.get("exhaust_fan") or raw_data.get("fan") or latest_cache["status"]["exhaust_fan"]
+            latest_cache["status"]["lamp"] = raw_data.get("lamp") or raw_data.get("lampu") or latest_cache["status"]["lamp"]
+            latest_cache["status"]["led"] = raw_data.get("led") or raw_data.get("led") or latest_cache["status"]["led"]
+            latest_cache["status"]["fan"] = raw_data.get("fan") or raw_data.get("fan") or latest_cache["status"]["fan"]
 
-        # Eksekusi tulis setiap ada data baru masuk
         save_cache_to_disk()
 
     except Exception as e:
-        print(f"❌ [ERROR Listener]: Gagal standarisasi data. Detail: {e}")
+        print(f"❌ [ERROR Listener]: just an error. Detail: {e}")
 
 def main():
-    # Inisialisasi awal file cache saat boot agar tidak kosong (0 bytes)
-    print("[-] Menginisialisasi berkas state sirkuit lokal...")
+    print("[-] yes?...")
     save_cache_to_disk()
 
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)

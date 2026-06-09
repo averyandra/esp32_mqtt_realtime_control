@@ -4,6 +4,11 @@ __pycache__/
 
 # Virtual Environment
 vorsapi-env/
+idk/
+*.ino
+*.php
 
 # Runtime state / local data
-state.json
+*.json
+.env
+

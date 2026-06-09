@@ -1,0 +1,1 @@
+device_list = ["R1", "R2", "R3"]
