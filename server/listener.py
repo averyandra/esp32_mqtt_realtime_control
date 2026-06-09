@@ -20,7 +20,7 @@ def save_cache_to_disk():
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(latest_cache, f, indent=4)
     except Exception as e:
-        print(f"[!] Gagal menulis ke {STATE_FILE}: {e}")
+        print(f"[!] cant write to {STATE_FILE}: {e}")
 
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code == 0:
