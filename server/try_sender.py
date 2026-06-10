@@ -20,7 +20,7 @@ def send_multiple_command(param: dict):
         client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         client.connect(conf.MQTT_BROKER, conf.MQTT_PORT, 60)
         topic =f"{conf.TOPIC_CONTROL_PREFIX}{device}"
-        client.publish(topic, state, retain=True)
+        client.publish(param, retain=True)
         client.disconnect()
         return {"status": "success", "topic": topic, "message": state}
     except Exception as e:

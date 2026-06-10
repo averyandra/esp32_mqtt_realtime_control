@@ -11,5 +11,4 @@ idk/
 # Runtime state / local data
 *.json
 .env
-
-web_monitor
+sender.py
