@@ -11,4 +11,4 @@ idk/
 # Runtime state / local data
 *.json
 .env
-sender.py
+server/sender.py
