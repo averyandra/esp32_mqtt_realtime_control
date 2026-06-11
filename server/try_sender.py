@@ -16,17 +16,18 @@ def send_command(device, state):
         return {"status": "error", "detail": str(e)}
 
 def send_multiple_command(param: dict):
-    try:
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        client.connect(conf.MQTT_BROKER, conf.MQTT_PORT, 60)
-        topic =f"{conf.TOPIC_CONTROL_PREFIX}{device}"
-        client.publish(param, retain=True)
-        client.disconnect()
-        return {"status": "success", "topic": topic, "message": state}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
+    # try:
+    #     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    #     client.connect(conf.MQTT_BROKER, conf.MQTT_PORT, 60)
+    #     topic =f"{conf.TOPIC_CONTROL_PREFIX}{device}"
+    #     client.publish(param, retain=True)
+    #     client.disconnect()
+    #     return {"status": "success", "topic": topic, "message": state}
+    # except Exception as e:
+    #     return {"status": "error", "detail": str(e)}
+    pass
 
-if __name__ == "__main__":
+def main():
     try:
         mode = int(input("[1] single or [2] multiple command :> "))
         if mode == 1:
@@ -41,3 +42,6 @@ if __name__ == "__main__":
             print("input must be [1] or [2]")
     except ValueError:
         print("input must be a number")
+
+if __name__ == "__main__":
+    main()

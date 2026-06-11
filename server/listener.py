@@ -40,7 +40,7 @@ def on_message(client, userdata, msg):
         raw_data = json.loads(payload_str)
 
         if msg.topic == TOPIC_TELEMETRY:
-            latest_cache["telemketry"]["12v"] = raw_data.get("12v") or raw_data.get("v12") or latest_cache["telemetry"]["12v"]
+            latest_cache["telemetry"]["12v"] = raw_data.get("12v") or raw_data.get("v12") or latest_cache["telemetry"]["12v"]
             latest_cache["telemetry"]["5v"] = raw_data.get("5v") or raw_data.get("v5") or latest_cache["telemetry"]["5v"]
             latest_cache["telemetry"]["5vsb"] = raw_data.get("5vsb") or raw_data.get("v5vsb") or latest_cache["telemetry"]["5vsb"]
             latest_cache["telemetry"]["pg"] = raw_data.get("pg") if raw_data.get("pg") is not None else raw_data.get("power_good", latest_cache["telemetry"]["pg"])

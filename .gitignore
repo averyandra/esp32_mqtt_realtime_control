@@ -5,10 +5,10 @@ __pycache__/
 # Virtual Environment
 vorsapi-env/
 idk/
-*.ino
+
 *.php
 
 # Runtime state / local data
 *.json
 .env
-server/sender.py
+server/sender.py    
