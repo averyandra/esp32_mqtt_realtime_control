@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
+#include <ArduinoJson.h> // Dynamic JSON handling library
 
 // Network & MQTT config
 const char* ssid         = "wifi-ssid";
@@ -14,7 +15,7 @@ const int mqtt_port      = 1883; // default
 // MQTT Topic
 const char* topic_telemetry = "lab/psu/1/telemetry";
 const char* topic_status    = "lab/psu/1/status";
-const char* topic_control   = "lab/control/#"; 
+const char* topic_control   = "lab/control/1/#"; // Scoped to PSU ID 1
 
 // --- Pin Definition (Relays) -> control relays by digital ouptut ---
 #define PIN_R1 25 // main lamp
@@ -46,17 +47,8 @@ const long statusInterval       = 1000; // 1s for actuator
 float v12 = 0.0, v5 = 0.0, v5sb = 0.0;
 float v12err = 1.0, v5err = 1.0, v5sberr = 1.0; // voltage measurements correction factor
 bool pg_status = false;
-float temperature = NAN, humidity = NAN, pressure = NAN;  
+float temperature = NAN, humidity = NAN, pressure = NAN;
 bool ahtReady = false, bmpReady = false;
-
-// ADC function for calculate attenuator... i guess
-// float readVoltage(int pin, float r1, float r2, float err) {
-//   int adcVal = analogRead(pin);
-//   float vOut = (adcVal * 3.3) / 4095.0;
-//   // return vOut * ((r1 + r2) / r2);
-//   float exvOut = vOut * ((r1 + r2) / r2);
-//   return exvOut * err;
-// }
 
 float readVoltage(int pin, float r1, float r2, float calibrationFactor) {
   int adcVal = analogRead(pin);
@@ -74,7 +66,6 @@ void setup_wifi() {
     delay(500); 
   }
 }
-
 
 // mqtt callback or process incoming data 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -99,9 +90,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     if (message == "1")  digitalWrite(PIN_R4, HIGH);
     if (message == "0") digitalWrite(PIN_R4, LOW);
   }
+  // Parsing Incoming JSON Correction Factors
   else if (strTopic.endsWith("CF")) {
-    if (message == "1")  digitalWrite(PIN_R4, HIGH);
-    if (message == "0") digitalWrite(PIN_R4, LOW);
+    JsonDocument doc; 
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error) {
+      if (doc.containsKey("v12"))   v12err   = doc["v12"];
+      if (doc.containsKey("v5"))    v5err    = doc["v5"];
+      if (doc.containsKey("v5sb"))  v5sberr  = doc["v5sb"];
+    }
   }
 }
 
@@ -148,10 +146,11 @@ void updateDisplay() {
   u8g2.print("PG:" + String(pg_status ? "OK" : "FAIL"));
   
   // Status singkat aktuator di pojok kanan bawah
-  u8g2.setCursor(65, 62);
+  u8g2.setCursor(55, 62);
   String actState = "R1:" + String(digitalRead(PIN_R1) == LOW ? "1" : "0") +
                     " R2:" + String(digitalRead(PIN_R2) == HIGH ? "1" : "0") +
-                    " R3:" + String(digitalRead(PIN_R3) == HIGH ? "1" : "0");
+                    " R3:" + String(digitalRead(PIN_R3) == HIGH ? "1" : "0") +
+                    " R4:" + String(digitalRead(PIN_R4) == HIGH ? "1" : "0");
   u8g2.print(actState);
   
   u8g2.sendBuffer();
@@ -242,14 +241,18 @@ void loop() {
     updateDisplay(); 
   }
 
-  // Task 2: actuator status to broker (1000ms / 1s)
+  // Task 2: actuator status and correction factor to broker (1000ms / 1s)
   if (currentMillis - lastStatusTime >= statusInterval) {
     lastStatusTime = currentMillis;
 
+    // Combined JSON string including Relays state and live Active Correction Factors (CF)
     String statusPayload = "{\"R1\":" + String(digitalRead(PIN_R1) == LOW ? "1" : "0") +
                            ",\"R2\":" + String(digitalRead(PIN_R2) == HIGH ? "1" : "0") +
                            ",\"R3\":" + String(digitalRead(PIN_R3) == HIGH ? "1" : "0") +
-                           ",\"R4\":" + String(digitalRead(PIN_R4) == HIGH ? "1" : "0") + "}";
+                           ",\"R4\":" + String(digitalRead(PIN_R4) == HIGH ? "1" : "0") + 
+                           ",\"cf\":{\"v12\":" + String(v12err, 4) +
+                           ",\"v5\":" + String(v5err, 4) +
+                           ",\"v5sb\":" + String(v5sberr, 4) + "}}";
     
     client.publish(topic_status, statusPayload.c_str());
   }
