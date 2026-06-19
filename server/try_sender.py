@@ -4,13 +4,9 @@ from devices import device_list
 
 devices = ["r1"]
 
-def send_command(device, state):
+def send_command(client, topic, state, retain: bool = False):
     try:
-        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        client.connect(conf.MQTT_BROKER, conf.MQTT_PORT, 60)
-        topic =f"{conf.TOPIC_CONTROL_PREFIX}{device}"
-        client.publish(topic, state, retain=True)
-        client.disconnect()
+        client.publish(topic, state, retain=retain)
         return {"status": "success", "topic": topic, "message": state}
     except Exception as e:
         return {"status": "error", "detail": str(e)}

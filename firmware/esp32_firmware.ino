@@ -12,14 +12,15 @@ const char* mqtt_server  = "server-ip";
 const int mqtt_port      = 1883; // default
 
 // MQTT Topic
-const char* topic_telemetry = "lab1/psu/1/telemetry";
-const char* topic_status    = "lab1/psu/1/status";
-const char* topic_control   = "lab1/control/#"; 
+const char* topic_telemetry = "lab/psu/1/telemetry";
+const char* topic_status    = "lab/psu/1/status";
+const char* topic_control   = "lab/control/#"; 
 
-// --- Pin Definition (Relays) ---
+// --- Pin Definition (Relays) -> control relays by digital ouptut ---
 #define PIN_R1 25 // main lamp
 #define PIN_R2 26 // led at my desk
-#define PIN_R3 27 // fan.. i guess?
+#define PIN_R3 14 // led at my rack -> need correction pin value
+#define PIN_R4 27 // fan.. i guess? -> need correction pin value
 
 // Voltage meter
 #define PIN_ADC_12V     32
@@ -43,15 +44,27 @@ const long statusInterval       = 1000; // 1s for actuator
 
 // --- Data variables ---
 float v12 = 0.0, v5 = 0.0, v5sb = 0.0;
+float v12err = 1.0, v5err = 1.0, v5sberr = 1.0; // voltage measurements correction factor
 bool pg_status = false;
-float temperature = NAN, humidity = NAN, pressure = NAN;
+float temperature = NAN, humidity = NAN, pressure = NAN;  
 bool ahtReady = false, bmpReady = false;
 
 // ADC function for calculate attenuator... i guess
-float readVoltage(int pin, float r1, float r2) {
+// float readVoltage(int pin, float r1, float r2, float err) {
+//   int adcVal = analogRead(pin);
+//   float vOut = (adcVal * 3.3) / 4095.0;
+//   // return vOut * ((r1 + r2) / r2);
+//   float exvOut = vOut * ((r1 + r2) / r2);
+//   return exvOut * err;
+// }
+
+float readVoltage(int pin, float r1, float r2, float calibrationFactor) {
   int adcVal = analogRead(pin);
-  float vOut = (adcVal * 3.3) / 4095.0;
-  return vOut * ((r1 + r2) / r2);
+  
+  // 4095.0 for ADC 12-bit ESP32
+  float vOut = (adcVal * 3.3) / 4095.0; 
+  float rawVoltage = vOut * ((r1 + r2) / r2);
+  return rawVoltage * calibrationFactor;
 }
 
 void setup_wifi() {
@@ -71,7 +84,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String strTopic = String(topic);
   
   if (strTopic.endsWith("R1")) {
-    if (message == "1")  digitalWrite(PIN_R1, LOW); // active low
+    if (message == "1")  digitalWrite(PIN_R1, LOW); // active low for relay that on if signal input is low
     if (message == "0") digitalWrite(PIN_R1, HIGH);
   } 
   else if (strTopic.endsWith("R2")) {
@@ -81,6 +94,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
   else if (strTopic.endsWith("R3")) {
     if (message == "1")  digitalWrite(PIN_R3, HIGH);
     if (message == "0") digitalWrite(PIN_R3, LOW);
+  }
+  else if (strTopic.endsWith("R4")) {
+    if (message == "1")  digitalWrite(PIN_R4, HIGH);
+    if (message == "0") digitalWrite(PIN_R4, LOW);
+  }
+  else if (strTopic.endsWith("CF")) {
+    if (message == "1")  digitalWrite(PIN_R4, HIGH);
+    if (message == "0") digitalWrite(PIN_R4, LOW);
   }
 }
 
@@ -159,13 +180,16 @@ void setup() {
 
   // 4. Setup Pin actuator mode
   pinMode(PIN_R1, OUTPUT);
-  digitalWrite(PIN_R1, LOW); // Default OFF (Active Low)
+  digitalWrite(PIN_R1, LOW); // Default OFF (Active Low), keep this, i want this to default ON
 
   pinMode(PIN_R2, OUTPUT);
-  digitalWrite(PIN_LED_STRIP, LOW);
+  digitalWrite(PIN_R2, LOW);
 
   pinMode(PIN_R3, OUTPUT);
   digitalWrite(PIN_R3, LOW);
+
+  pinMode(PIN_R4, OUTPUT);
+  digitalWrite(PIN_R4, LOW);
   
   pinMode(PIN_PIN_PG, INPUT);
   analogReadResolution(12);
@@ -189,9 +213,9 @@ void loop() {
     lastTelemetryTime = currentMillis;
 
     // read PSU electrical parameter
-    v12  = readVoltage(PIN_ADC_12V, 15100.0, 5100.0);
-    v5   = readVoltage(PIN_ADC_5V, 10000.0, 15100.0);
-    v5sb = readVoltage(PIN_ADC_5VSB, 10000.0, 15100.0);
+    v12  = readVoltage(PIN_ADC_12V, 15100.0, 5100.0, v12err);
+    v5   = readVoltage(PIN_ADC_5V, 10000.0, 15100.0, v5err);
+    v5sb = readVoltage(PIN_ADC_5VSB, 10000.0, 15100.0, v5sberr);
     pg_status = digitalRead(PIN_PIN_PG);
 
     // read environment data if sensors are ok
@@ -222,9 +246,10 @@ void loop() {
   if (currentMillis - lastStatusTime >= statusInterval) {
     lastStatusTime = currentMillis;
 
-    String statusPayload = "{\"R1\":" + String(digitalRead(PIN_R1) == LOW ? "\"1\"" : "\"0\"") +
-                           ",\"R2\":" + String(digitalRead(PIN_R2) == HIGH ? "\"1\"" : "\"0\"") +
-                           ",\"R3\":" + String(digitalRead(PIN_R3) == HIGH ? "\"1\"" : "\"0\"") + "}";
+    String statusPayload = "{\"R1\":" + String(digitalRead(PIN_R1) == LOW ? "1" : "0") +
+                           ",\"R2\":" + String(digitalRead(PIN_R2) == HIGH ? "1" : "0") +
+                           ",\"R3\":" + String(digitalRead(PIN_R3) == HIGH ? "1" : "0") +
+                           ",\"R4\":" + String(digitalRead(PIN_R4) == HIGH ? "1" : "0") + "}";
     
     client.publish(topic_status, statusPayload.c_str());
   }
