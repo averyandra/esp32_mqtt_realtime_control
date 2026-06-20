@@ -12,3 +12,5 @@ idk/
 *.json
 .env
 server/sender.py    
+server/ajeb_ajeb.py
+server/try_paho.py
