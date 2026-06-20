@@ -24,13 +24,20 @@ def send_multiple_command(param: dict):
     pass
 
 def main():
+
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+        
     try:
+        client.connect(conf.MQTT_BROKER, conf.MQTT_PORT, 60)
+
         mode = int(input("[1] single or [2] multiple command :> "))
         if mode == 1:
             device = input("select device :> ")
+            topic = f"{conf.TOPIC_CONTROL_PREFIX}{device}"
             state = input("select state : ON / OFF :> ")
-            print(send_command(device, state))
-        if mode == 2:
+            print(send_command(client, topic, state, True))
+            client.disconnect()
+        elif mode == 2:
             print(device_list[0])
             # for i in device_list:
             #     print(device_list[i])

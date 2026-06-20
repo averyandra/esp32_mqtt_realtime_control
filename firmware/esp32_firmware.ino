@@ -5,6 +5,7 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
 #include <ArduinoJson.h> // Dynamic JSON handling library
+#include <ArduinoOTA.h> 
 
 // Network & MQTT config
 const char* ssid         = "wifi-ssid";
@@ -197,6 +198,41 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+
+  ArduinoOTA.setHostname("ESP32_Lab_PSU_1"); // The name that will appear in the Arduino IDE
+  ArduinoOTA.setPassword("password");     // Optional: Give a password so that not just anyone can flash it.
+  
+  ArduinoOTA.onStart([]() {
+    u8g2.clearBuffer();
+    u8g2.drawStr(0, 12, "OTA UPDATE");
+    u8g2.drawStr(0, 32, "Receiving firmware...");
+    u8g2.sendBuffer();
+  });
+  
+  ArduinoOTA.onEnd([]() {
+    u8g2.clearBuffer();
+    u8g2.drawStr(0, 12, "OTA UPDATE");
+    u8g2.drawStr(0, 32, "Update Success!");
+    u8g2.drawStr(0, 48, "Rebooting...");
+    u8g2.sendBuffer();
+  });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    u8g2.clearBuffer();
+    u8g2.drawStr(0, 12, "OTA UPDATE");
+    u8g2.setCursor(0, 32);
+    u8g2.print("Progress: " + String(progress / (total / 100)) + "%");
+    u8g2.sendBuffer();
+  });
+
+  ArduinoOTA.onError([](ota_error_t error) {
+    u8g2.clearBuffer();
+    u8g2.drawStr(0, 12, "OTA ERROR");
+    u8g2.sendBuffer();
+  });
+
+  ArduinoOTA.begin();
+
 }
 
 void loop() {
