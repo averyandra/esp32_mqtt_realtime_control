@@ -170,17 +170,19 @@ void updateDisplay() {
     u8g2.print("BMP280: ERROR");
   }
   
+  u8g2.setFont(u8g2_font_5x7_tf);
+
   // row 4: pg status & actuator status
   u8g2.setCursor(0, 62);
   u8g2.print("PG:" + String(pg_status ? "OK" : "FAIL"));
   
-  // Status singkat aktuator di pojok kanan bawah
-  u8g2.setCursor(55, 62);
-  String actState = "R1:" + String(digitalRead(PIN_R1) == LOW ? "1" : "0") +
-                    " R2:" + String(digitalRead(PIN_R2) == HIGH ? "1" : "0") +
-                    " R3:" + String(digitalRead(PIN_R3) == HIGH ? "1" : "0") +
-                    " R4:" + String(digitalRead(PIN_R4) == HIGH ? "1" : "0");
-  u8g2.print(actState);
+  // simplified actuators display
+  u8g2.setCursor(75, 62); 
+  String actState = "R:" + String(digitalRead(PIN_R1) == LOW ? "1" : "0") +
+                           String(digitalRead(PIN_R2) == HIGH ? "1" : "0") +
+                           String(digitalRead(PIN_R3) == HIGH ? "1" : "0") +
+                           String(digitalRead(PIN_R4) == HIGH ? "1" : "0");
+  u8g2.print(actState); // results on screen: R:1000
   
   u8g2.sendBuffer();
 }
