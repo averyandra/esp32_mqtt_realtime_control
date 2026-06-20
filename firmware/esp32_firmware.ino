@@ -21,8 +21,8 @@ const char* topic_control   = "lab/control/1/#"; // Scoped to PSU ID 1
 // --- Pin Definition (Relays) -> control relays by digital ouptut ---
 #define PIN_R1 25 // main lamp
 #define PIN_R2 26 // led at my desk
-#define PIN_R3 14 // led at my rack -> need correction pin value
-#define PIN_R4 27 // fan.. i guess? -> need correction pin value
+#define PIN_R3 14 // led at my rack
+#define PIN_R4 27 // fan.. i guess?
 
 // Voltage meter
 #define PIN_ADC_12V     32
@@ -100,6 +100,34 @@ void callback(char* topic, byte* payload, unsigned int length) {
       if (doc.containsKey("v12"))   v12err   = doc["v12"];
       if (doc.containsKey("v5"))    v5err    = doc["v5"];
       if (doc.containsKey("v5sb"))  v5sberr  = doc["v5sb"];
+    }
+  }
+  // Parsing Incoming JSON Bulk Controls via "/all"
+  else if (strTopic.endsWith("all")) {
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error) {
+      // Execute R1 (Active Low)
+      if (doc.containsKey("R1")) {
+        int r1_val = doc["R1"];
+        digitalWrite(PIN_R1, (r1_val == 1) ? LOW : HIGH);
+      }
+      // Execute R2 (Active High)
+      if (doc.containsKey("R2")) {
+        int r2_val = doc["R2"];
+        digitalWrite(PIN_R2, (r2_val == 1) ? HIGH : LOW);
+      }
+      // Execute R3 (Active High)
+      if (doc.containsKey("R3")) {
+        int r3_val = doc["R3"];
+        digitalWrite(PIN_R3, (r3_val == 1) ? HIGH : LOW);
+      }
+      // Execute R4 (Active High)
+      if (doc.containsKey("R4")) {
+        int r4_val = doc["R4"];
+        digitalWrite(PIN_R4, (r4_val == 1) ? HIGH : LOW);
+      }
     }
   }
 }
