@@ -70,10 +70,9 @@ def send_command(device: str, state: str or dict):
         
         # Process Payload dynamically depending on targets
         if device == "calibrator" or device == "all":
-            # Direct stringify for dictionary payloads (CF and bulk controls)
             payload = json.dumps(state)
         else:
-            # Map 'ON' to '1' and 'OFF' to '0' for single binary logic
+            # Map 'ON' to '1' and 'OFF' to '0' to comply with ESP32 binary logic
             payload = "1" if state == "ON" else "0"
 
         client.publish(topic, payload, retain=True)
@@ -91,30 +90,45 @@ def main():
         mode = int(input("[1] Single Command or [2] Multiple Commands (Bulk JSON) :> "))
         
         if mode == 1:
-            device = input("Select device (e.g., lamp/led/fan/calibrator) :> ").strip()
+            device = input("Select device (e.g., lamp/led/fan/calibrator) :> ").strip().lower()
             
+            # --- Calibration Mode Loop (prevents manual JSON string input) ---
             if device == "calibrator":
-                print("Enter correction factors (JSON format required, e.g., {'v12': 1.02})")
-                cf_input = input("JSON Data :> ").strip()
-                try:
-                    state = json.loads(cf_input.replace("'", '"'))
-                except json.JSONDecodeError:
-                    print("❌ Invalid JSON format!")
+                print("\n[!] Entering Calibration Mode Loop")
+                print("Leave blank (press Enter) to skip a specific voltage factor.")
+                
+                cf_payload = {}
+                voltage_keys = ["v12", "v5", "v5sb"]
+                
+                for key in voltage_keys:
+                    val_input = input(f"Input factor for {key} (e.g., 1.024) :> ").strip()
+                    if val_input: # If input is provided (not empty)
+                        try:
+                            cf_payload[key] = float(val_input)
+                        except ValueError:
+                            print(f"❌ '{val_input}' is not a valid float number! Skipping {key}.")
+                
+                if not cf_payload:
+                    print("❌ No calibration factors entered. Operation cancelled.")
                     return
+                
+                print(f"\nConstructed CF Payload: {cf_payload}")
+                print("Sending calibration factor data...")
+                print(send_command("calibrator", cf_payload))
+            
+            # --- Logic for standard single actuators ---
             else:
                 state = input("Select state (ON / OFF) :> ").strip().upper()
                 if state not in ["ON", "OFF"]:
                     print("❌ State must be ON or OFF!")
                     return
-            
-            print("\nSending command...")
-            print(send_command(device, state))
+                print("\nSending command...")
+                print(send_command(device, state))
 
         elif mode == 2:
             print("\n[!] Setting states individually for all devices into a single JSON payload")
             bulk_payload = {}
             
-            # Loop through each target item and ask user for inputs
             for dev in device_list:
                 if dev not in ["calibrator", "all"]:
                     state = input(f"Set state for '{dev}' (ON / OFF) :> ").strip().upper()
@@ -122,11 +136,10 @@ def main():
                         print("❌ Invalid input! Defaulting to OFF.")
                         state = "OFF"
                     
-                    # Convert straight to ESP32 binary logic keys ("R1", "R2", etc.)
                     mqtt_key = DEVICE_MAP[dev]
                     bulk_payload[mqtt_key] = 1 if state == "ON" else 0
             
-            print(f"\nConstructed Payload: {bulk_payload}")
+            print(f"\nConstructed Bulk Payload: {bulk_payload}")
             print("Sending bulk command to /all...")
             print(send_command("all", bulk_payload))
             
