@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv 
 
-load_dotenv(".env")
+load_dotenv("../.env")
 
 MQTT_BROKER = os.getenv("MQTT_BROKER")  # IP MQTT Broker
 MQTT_PORT = int(os.getenv("MQTT_PORT"))

@@ -6,12 +6,10 @@ __pycache__/
 vorsapi-env/
 idk/
 
-*.php
-
 # Runtime state / local data
 *.json
 .env
-backend/sender.py    
+backend/try_sender.py    
 backend/ajeb_ajeb.py
 backend/try_paho.py
 task.md
