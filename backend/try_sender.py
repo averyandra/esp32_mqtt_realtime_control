@@ -106,10 +106,10 @@ def main():
                         try:
                             cf_payload[key] = float(val_input)
                         except ValueError:
-                            print(f"❌ '{val_input}' is not a valid float number! Skipping {key}.")
+                            print(f"'{val_input}' is not a valid float number! Skipping {key}.")
                 
                 if not cf_payload:
-                    print("❌ No calibration factors entered. Operation cancelled.")
+                    print("No calibration factors entered. Operation cancelled.")
                     return
                 
                 print(f"\nConstructed CF Payload: {cf_payload}")
@@ -120,7 +120,7 @@ def main():
             else:
                 state = input("Select state (ON / OFF) :> ").strip().upper()
                 if state not in ["ON", "OFF"]:
-                    print("❌ State must be ON or OFF!")
+                    print("State must be ON or OFF!")
                     return
                 print("\nSending command...")
                 print(send_command(device, state))
@@ -133,7 +133,7 @@ def main():
                 if dev not in ["calibrator", "all"]:
                     state = input(f"Set state for '{dev}' (ON / OFF) :> ").strip().upper()
                     if state not in ["ON", "OFF"]:
-                        print("❌ Invalid input! Defaulting to OFF.")
+                        print("Invalid input! Defaulting to OFF.")
                         state = "OFF"
                     
                     mqtt_key = DEVICE_MAP[dev]
@@ -144,12 +144,12 @@ def main():
             print(send_command("all", bulk_payload))
             
         else:
-            print("❌ Input must be [1] or [2]")
+            print("Input must be [1] or [2]")
             
     except ValueError:
-        print("❌ Input must be a valid number!")
+        print("Input must be a valid number!")
     except Exception as e:
-        print(f"❌ Debugger Error: {e}")
+        print(f"Debugger Error: {e}")
 
 if __name__ == "__main__":
     main()

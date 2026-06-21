@@ -8,5 +8,5 @@ DEVICE_MAP = {
     "rack_led": "R3",
     "fan": "R4",
     "calibrator": "CF",
-    "all": "all" # ◄ Tambahkan target topik baru ini
+    "all": "all"
 }
