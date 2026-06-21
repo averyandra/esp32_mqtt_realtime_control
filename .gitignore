@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual Environment
+vorsapi-env/
+idk/
+
+*.php
+
+# Runtime state / local data
+*.json
+.env
+backend/sender.py    
+backend/ajeb_ajeb.py
+backend/try_paho.py
+task.md
