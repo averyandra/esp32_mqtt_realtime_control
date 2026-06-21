@@ -132,12 +132,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
+// void reconnect() {
+//   while (!client.connected()) {
+//     if (client.connect("ESP32_Lab_Controller")) {
+//       client.subscribe(topic_control);
+//     } else {
+//       delay(2000); 
+//     }
+//   }
+// }
+
 void reconnect() {
-  while (!client.connected()) {
-    if (client.connect("ESP32_Lab_Controller")) {
-      client.subscribe(topic_control);
-    } else {
-      delay(2000); 
+  static unsigned long lastReconnectAttempt = 0;
+  unsigned long now = millis();
+  
+  if (!client.connected()) {
+    if (now - lastReconnectAttempt > 5000) {
+      lastReconnectAttempt = now;
+      
+      if (client.connect("ESP32_Lab_Controller")) {
+        client.subscribe(topic_control);
+      }
     }
   }
 }
@@ -266,6 +281,8 @@ void setup() {
 }
 
 void loop() {
+  ArduinoOTA.handle();
+
   if (!client.connected()) {
     reconnect();
   }
