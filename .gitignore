@@ -11,7 +11,7 @@ idk/
 # Runtime state / local data
 *.json
 .env
-server/sender.py    
-server/ajeb_ajeb.py
-server/try_paho.py
+backend/sender.py    
+backend/ajeb_ajeb.py
+backend/try_paho.py
 task.md
