@@ -75,7 +75,7 @@ def on_message(client, userdata, msg):
         save_cache_to_disk()
 
     except Exception as e:
-        print(f"❌ [ERROR Listener]: {e}")
+        print(f"[ERROR Listener]: {e}")
 
 def main():
     print("[-] Starting MQTT Listener Service...")

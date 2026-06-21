@@ -1,11 +1,11 @@
 import asyncio
 import json
-import os
-import aiofiles
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from config import STATE_FILE
+import paho.mqtt.client as mqtt
+
+from config import MQTT_BROKER, MQTT_PORT, TOPIC_TELEMETRY, TOPIC_STATUS
 from devices import DEVICE_MAP
 import sender
 
@@ -19,6 +19,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global in-memory state shared across MQTT thread and FastAPI async loop
+SHARED_STATE = {
+    "telemetry": {
+        "12v": 0.0, "5v": 0.0, "5vsb": 0.0, "pg": 0,
+        "env": {"temp": 0.0, "hum": 0, "pres": 0.0}
+    },
+    "status": {
+        "lamp": "OFF", "led": "OFF", "rack_led": "OFF", "fan": "OFF"
+    },
+    "cf": {
+        "v12": 1.0, "v5": 1.0, "v5sb": 1.0
+    }
+}
+
 class ControlRequest(BaseModel):
     device: str  
     state: str   
@@ -27,6 +41,58 @@ class CalibrationRequest(BaseModel):
     v12: float = None
     v5: float = None
     v5sb: float = None
+
+def on_mqtt_connect(client, userdata, flags, reason_code, properties):
+    if reason_code == 0:
+        print("[-] MQTT Background Listener active and connected")
+        client.subscribe(TOPIC_TELEMETRY)
+        client.subscribe(TOPIC_STATUS)
+    else:
+        print(f"[!] MQTT Connection failed with code: {reason_code}")
+
+def on_mqtt_message(client, userdata, msg):
+    try:
+        payload_str = msg.payload.decode('utf-8')
+        payload_str = payload_str.replace('nan', 'null').replace('NAN', 'null').replace('NaN', 'null')
+        raw_data = json.loads(payload_str)
+
+        if msg.topic == TOPIC_TELEMETRY:
+            SHARED_STATE["telemetry"]["12v"] = raw_data.get("12v") or raw_data.get("v12") or SHARED_STATE["telemetry"]["12v"]
+            SHARED_STATE["telemetry"]["5v"] = raw_data.get("5v") or raw_data.get("v5") or SHARED_STATE["telemetry"]["5v"]
+            SHARED_STATE["telemetry"]["5vsb"] = raw_data.get("5vsb") or raw_data.get("v5vsb") or SHARED_STATE["telemetry"]["5vsb"]
+            SHARED_STATE["telemetry"]["pg"] = raw_data.get("pg") if raw_data.get("pg") is not None else SHARED_STATE["telemetry"]["pg"]
+            
+            if "env" in raw_data:
+                env_raw = raw_data["env"]
+                SHARED_STATE["telemetry"]["env"]["temp"] = env_raw.get("temp") if env_raw.get("temp") is not None else SHARED_STATE["telemetry"]["env"]["temp"]
+                SHARED_STATE["telemetry"]["env"]["hum"] = env_raw.get("hum") if env_raw.get("hum") is not None else SHARED_STATE["telemetry"]["env"]["hum"]
+                SHARED_STATE["telemetry"]["env"]["pres"] = env_raw.get("pres") if env_raw.get("pres") is not None else SHARED_STATE["telemetry"]["env"]["pres"]
+
+        elif msg.topic == TOPIC_STATUS:
+            if "R1" in raw_data:
+                SHARED_STATE["status"]["lamp"] = "ON" if str(raw_data["R1"]) == "1" else "OFF"
+            if "R2" in raw_data:
+                SHARED_STATE["status"]["led"] = "ON" if str(raw_data["R2"]) == "1" else "OFF"
+            if "R3" in raw_data:
+                SHARED_STATE["status"]["rack_led"] = "ON" if str(raw_data["R3"]) == "1" else "OFF"
+            if "R4" in raw_data:
+                SHARED_STATE["status"]["fan"] = "ON" if str(raw_data["R4"]) == "1" else "OFF"
+            
+            if "cf" in raw_data:
+                cf_raw = raw_data["cf"]
+                SHARED_STATE["cf"]["v12"] = cf_raw.get("v12", SHARED_STATE["cf"]["v12"])
+                SHARED_STATE["cf"]["v5"] = cf_raw.get("v5", SHARED_STATE["cf"]["v5"])
+                SHARED_STATE["cf"]["v5sb"] = cf_raw.get("v5sb", SHARED_STATE["cf"]["v5sb"])
+
+    except Exception as e:
+        print(f"[ERROR Listener]: {e}")
+
+# Start background thread loop for MQTT
+mqtt_client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+mqtt_client.on_connect = on_mqtt_connect
+mqtt_client.on_message = on_mqtt_message
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+mqtt_client.loop_start() 
 
 @app.post("/api/control")
 def control_device(req: ControlRequest):
@@ -40,7 +106,6 @@ def control_device(req: ControlRequest):
 
 @app.post("/api/calibrate")
 def calibrate_sensors(req: CalibrationRequest):
-    # Pack parameters sent from dashboard UI
     cf_data = {}
     if req.v12 is not None: cf_data["v12"] = req.v12
     if req.v5 is not None: cf_data["v5"] = req.v5
@@ -57,34 +122,12 @@ def calibrate_sensors(req: CalibrationRequest):
 @app.websocket("/ws/monitor")
 async def websocket_monitor(websocket: WebSocket):
     await websocket.accept()
-    print(f"[-] Client connected to telemetry websocket channel")
-    
-    fallback_data = {
-        "telemetry": {"12v": 0.0, "5v": 0.0, "5vsb": 0.0, "pg": 0, "env": {"temp": 0.0, "hum": 0, "pres": 0.0}},
-        "status": {"lamp": "OFF", "led": "OFF", "rack_led": "OFF", "fan": "OFF"},
-        "cf": {"v12": 1.0, "v5": 1.0, "v5sb": 1.0}
-    }
+    print("[-] Client connected to telemetry websocket channel")
     
     try:
         while True:
-            current_data = None
-            if os.path.exists(STATE_FILE):
-                try:
-                    async with aiofiles.open(STATE_FILE, mode='rb') as f:
-                        raw_bytes = await f.read()
-                        if raw_bytes:
-                            current_data = json.loads(raw_bytes.decode('utf-8'))
-                except Exception:
-                    pass
-            
-            if not current_data:
-                current_data = fallback_data
-            else:
-                if "telemetry" not in current_data: current_data["telemetry"] = fallback_data["telemetry"]
-                if "status" not in current_data: current_data["status"] = fallback_data["status"]
-                if "cf" not in current_data: current_data["cf"] = fallback_data["cf"]
-
-            await websocket.send_json(current_data)
+            # Streams data instantly from memory without file I/O operations
+            await websocket.send_json(SHARED_STATE)
             await asyncio.sleep(0.5)
             
     except WebSocketDisconnect:

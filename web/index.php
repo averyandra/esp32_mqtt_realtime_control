@@ -266,6 +266,29 @@ $prodWs   = $config['PROD_WS_URL']   ?? "wss://api.yourpublicdomain.com";
         </section>
 
         <section class="card">
+            <h2>Sensor Calibration</h2>
+            <div class="control-list" style="gap: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                    <div>
+                        <label class="data-label" style="display: block; margin-bottom: 0.4rem; font-weight: bold;">+12V Factor</label>
+                        <input type="number" id="cf-v12-input" step="0.0001" placeholder="1.0000" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-family: monospace; text-align: center;">
+                    </div>
+                    <div>
+                        <label class="data-label" style="display: block; margin-bottom: 0.4rem; font-weight: bold;">+5V Factor</label>
+                        <input type="number" id="cf-v5-input" step="0.0001" placeholder="1.0000" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-family: monospace; text-align: center;">
+                    </div>
+                    <div>
+                        <label class="data-label" style="display: block; margin-bottom: 0.4rem; font-weight: bold;">5VSB Factor</label>
+                        <input type="number" id="cf-v5sb-input" step="0.0001" placeholder="1.0000" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; font-family: monospace; text-align: center;">
+                    </div>
+                </div>
+                <button id="calibrate-btn" class="btn-toggle" onclick="submitCalibration()" style="width: 100%; padding: 0.8rem; text-align: center;">
+                    APPLY CORRECTION FACTORS
+                </button>
+            </div>
+        </section>
+
+        <section class="card">
             <h2>Environment Sensor</h2>
             <div class="grid-data">
                 <div class="data-box">
@@ -333,8 +356,9 @@ $prodWs   = $config['PROD_WS_URL']   ?? "wss://api.yourpublicdomain.com";
             wsBase = "<?= $localWs; ?>";
         }
 
-        const WS_URL = `${wsBase}/ws/monitor`;
         const API_URL = `${apiBase}/api/control`;
+        const CALIBRATE_URL = `${apiBase}/api/calibrate`; // Jalur endpoint baru
+        const WS_URL = `${wsBase}/ws/monitor`;
 
         let ws = null;
         let reconnectTimeout = null;
@@ -383,6 +407,12 @@ $prodWs   = $config['PROD_WS_URL']   ?? "wss://api.yourpublicdomain.com";
                     updateDOMText("temp-val", env["temp"], " °C", false, 1);
                     updateDOMText("hum-val", env["hum"], " %", false, 0);
                     updateDOMText("pres-val", env["pres"], " hPa", false, 1);
+
+                    // Sync Live Correction Factors from ESP32 status message to UI inputs
+                    const cf = payload?.cf || {};
+                    syncCalibrationInput("cf-v12-input", cf["v12"]);
+                    syncCalibrationInput("cf-v5-input", cf["v5"]);
+                    syncCalibrationInput("cf-v5sb-input", cf["v5sb"]);
 
                     // 3. Sync Actuator Status States mapping with Python listener cache
                     syncButtonUI("lamp", status["lamp"]);
@@ -479,6 +509,57 @@ $prodWs   = $config['PROD_WS_URL']   ?? "wss://api.yourpublicdomain.com";
             })
             .finally(() => {
                 // Unlock element access once transmission clears
+                if (btn) btn.disabled = false;
+            });
+        }
+
+        // Prevents live incoming WebSocket data from overwriting text fields while the user is actively typing
+        function syncCalibrationInput(elementId, value) {
+            const input = document.getElementById(elementId);
+            if (input && document.activeElement !== input && value !== undefined) {
+                input.value = parseFloat(value).toFixed(4); // Match ESP32 4-decimal float precision
+            }
+        }
+
+        // Submits user-defined factors to the FastAPI backend microservice
+        function submitCalibration() {
+            const btn = document.getElementById("calibrate-btn");
+            const v12Val = document.getElementById("cf-v12-input").value;
+            const v5Val = document.getElementById("cf-v5-input").value;
+            const v5sbVal = document.getElementById("cf-v5sb-input").value;
+
+            const payload = {};
+            if (v12Val !== "") payload.v12 = parseFloat(v12Val);
+            if (v5Val !== "") payload.v5 = parseFloat(v5Val);
+            if (v5sbVal !== "") payload.v5sb = parseFloat(v5sbVal);
+
+            if (Object.keys(payload).length === 0) {
+                alert("Please fill at least one correction factor field before applying changes.");
+                return;
+            }
+
+            if (btn) btn.disabled = true;
+            console.log("[-] Dispatched terminal calibration request:", payload);
+
+            fetch(CALIBRATE_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP network error returned status code: ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                console.log("[-] Backend execution verification received:", data);
+            })
+            .catch(err => {
+                console.error("[!] Error executing post configuration parameters:", err);
+                alert("Failed to deliver adjustment constants down to target MCU device loop.");
+            })
+            .finally(() => {
                 if (btn) btn.disabled = false;
             });
         }
