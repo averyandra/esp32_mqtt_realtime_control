@@ -8,9 +8,24 @@ An integrated real-time telemetry monitor and actuator control system for Labora
 
 The system utilizes an **in-memory RAM architecture** to handle rapid telemetry streams without introducing disk I/O bottlenecks.
 
-```text
-[ESP32 Firmware] ──(MQTT: Telemetry/Status)──> [FastAPI Backend] <──(WebSocket)──> [PHP Web UI]
-[ESP32 Firmware] <──(MQTT: Control/CF)─────── [FastAPI Backend] <──(HTTP POST)─── [PHP Web UI]
+```mermaid
+graph LR
+    ESP32[ESP32 Firmware]
+    FastAPI[FastAPI Backend]
+    PHP[PHP Web UI]
+
+    %% Jalur Telemetry / Status
+    ESP32 -- "MQTT: Telemetry/Status" --> FastAPI
+    FastAPI -- "WebSocket" --> PHP
+
+    %% Jalur Control / Configuration
+    PHP -- "HTTP POST" --> FastAPI
+    FastAPI -- "MQTT: Control/CF" --> ESP32
+
+    %% Styling (Opsional, agar visualisasi lebih menarik)
+    style ESP32 fill:#f9f,stroke:#333,stroke-width:2px
+    style FastAPI fill:#bbf,stroke:#333,stroke-width:2px
+    style PHP fill:#fbf,stroke:#333,stroke-width:2px
 ```
 
 ### Components
