@@ -14,18 +14,13 @@ graph LR
     FastAPI[FastAPI Backend]
     PHP[PHP Web UI]
 
-    %% Jalur Telemetry / Status
+    %% Telemetry Flow / Status
     ESP32 -- "MQTT: Telemetry/Status" --> FastAPI
     FastAPI -- "WebSocket" --> PHP
 
-    %% Jalur Control / Configuration
+    %% Control Flow / Configuration
     PHP -- "HTTP POST" --> FastAPI
     FastAPI -- "MQTT: Control/CF" --> ESP32
-
-    %% Styling (Opsional, agar visualisasi lebih menarik)
-    style ESP32 fill:#f9f,stroke:#333,stroke-width:2px
-    style FastAPI fill:#bbf,stroke:#333,stroke-width:2px
-    style PHP fill:#fbf,stroke:#333,stroke-width:2px
 ```
 
 ### Components
